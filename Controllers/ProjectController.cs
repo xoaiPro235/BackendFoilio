@@ -1,11 +1,12 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using BackEndFolio.API.Hubs;
+using BackEndFolio.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Supabase.Postgrest;
-using BackEndFolio.API.Hubs;
-using BackEndFolio.Models;
 using System.Security.Claims;
+using static Supabase.Postgrest.Constants;
 
 
 
@@ -29,33 +30,77 @@ public class ProjectController : ControllerBase
     {
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-        var response = await _supabase
-            .From<ProjectMember>()
-            .Select("*, projects(*)")
-            .Where(x => x.UserId == userId)
-            .Get();
-        var projects = response.Models.Select(m => m.Project).ToList();
-        return Ok(projects);
-    }
+        var myMemberships = await _supabase
+        .From<ProjectMember>()
+        .Select("project_id")
+        .Filter("user_id", Operator.Equals, userId)
+        .Get();
+
+        var projectIds = myMemberships.Models
+            .Select(m => m.ProjectId)
+            .ToList();
+
+
+        var res = await _supabase
+        .From<ProjectMember>()
+        .Select("role")
+        .Filter("project_id", Operator.In, projectIds)
+        .Get();
+
+        var rows = res.Models;
+
+
+        var result = rows
+        .GroupBy(r => r.Project.Id)
+        .Select(g => new
+        {
+            Project = g.First().Project,
+            Members = g.Select(x => new
+            {
+                x.Profile.Id,
+                x.Profile.Name,
+                x.Profile.Email,
+                x.Profile.AvatarUrl,
+                x.Profile.Bio,
+                x.Profile.IsOnline,
+                x.Role
+            }).ToList()
+        })
+        .ToList();
+
+        return Ok(result);
+
+
+    } 
 
     // POST: api/projects (Create new project)
     [HttpPost]
-    public async Task<IActionResult> CreateProject([FromBody] Project project)
+    public async Task<IActionResult> CreateProject([FromBody] CreateProject projectCreateRequest)
     {
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        project.OwnerId = userId;
 
-        // 1. Tạo Project
-        var resProject = await _supabase.From<Project>().Insert(project);
+        var project = new Project
+        {
+            Name = projectCreateRequest.Name,
+            Description = projectCreateRequest.Description,
+            OwnerId = userId,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // 1. Tạo Project và YÊU CẦU TRẢ VỀ DỮ LIỆU ĐẦY ĐỦ
+        var resProject = await _supabase.From<Project>()
+            .Insert(project);
+
         var newProject = resProject.Models.FirstOrDefault();
 
-
-        // 2. Add Owner vào bảng Member luôn
-        if (newProject != null)
+        var member = new ProjectMember
         {
-            var member = new ProjectMember { ProjectId = newProject.Id, UserId = userId, Role = "OWNER" };
-            await _supabase.From<ProjectMember>().Insert(member);
-        }
+            ProjectId = newProject.Id,
+            UserId = userId,
+            Role = "OWNER"
+        };
+
+        await _supabase.From<ProjectMember>().Insert(member);
 
         return Ok(newProject);
     }
@@ -67,7 +112,7 @@ public class ProjectController : ControllerBase
     {
         var respone = await _supabase
             .From<ProjectMember>()
-            .Select("*, profile(*)")
+            .Select("*")
             .Where(x => x.ProjectId == id)
             .Get();
 
@@ -77,22 +122,72 @@ public class ProjectController : ControllerBase
             m.Profile.Name,
             m.Profile.Email,
             m.Profile.AvatarUrl,
-            Role = m.Role
-        });
-
+        })
+        .ToList();
         return Ok(members);
     }
 
     // POST: api/projects/{id}/members (Add member to project)
     [HttpPost("{id}/members")]
-    public async Task<IActionResult> InviteMember( string id, [FromBody] ProjectMember member)
+    public async Task<IActionResult> InviteMember(string id, [FromBody] InviteMemberRequest rq)
     {
-        member.ProjectId = id;
+        var member = new ProjectMember()
+        {
+            UserId = rq.UserId,
+            ProjectId = id,
+            Role = rq.Role
+        };
+        
         var response = await _supabase.From<ProjectMember>().Insert(member);
         var newMember = response.Models.FirstOrDefault();
         // Bắn SignalR báo user đó biết (Optional)
         // await _hubContext.Clients.User(member.UserId).SendAsync("Notification", "You were invited...");
         return Ok(newMember);
+    }
+
+    // DELETE: api/projects/{id}/members/{userId} (Remove member from project)
+    [HttpDelete("{id}/members/{userId}")]
+    public async Task<IActionResult> RemoveMember(string id, string userId)
+    {
+        await _supabase
+            .From<ProjectMember>()
+            .Where(x => x.ProjectId == id && x.UserId == userId)
+            .Delete();
+        return Ok(new { message = "Member removed successfully" });
+    }
+
+    // DELETE: api/projects/{id} (Delete project)
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteProject(string id)
+    {
+        await _supabase
+            .From<Project>()
+            .Where(x => x.Id == id)
+            .Delete();
+        return Ok(new { message = "Project deleted successfully" });
+    }
+
+    // PATCH: api/projects/{id}/members/{userId} (Update member role)
+    [HttpPatch("{id}/members/{userId}")]
+    public async Task<IActionResult> UpdateMemberRole(string id, string userId,[FromBody] UpdateMemberRoleRequest request)
+    {
+        var response = await _supabase
+            .From<ProjectMember>()
+            .Where(x => x.UserId == userId && x.ProjectId == id)
+            .Get();
+
+        var member = response.Models.FirstOrDefault();
+
+        if (member == null)
+        {
+            return NotFound();
+        }
+
+        member.Role = request.Role;
+
+        await _supabase.From<ProjectMember>().Update(member);
+
+        return Ok(member.Role);
     }
 }
 

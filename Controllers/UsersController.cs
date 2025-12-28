@@ -32,6 +32,18 @@ public class UsersController : ControllerBase
         return Ok(response.Models);
     }
 
+    // GET: api/users/all
+    [HttpGet("all")]
+    public async Task<IActionResult> GetAllUsers()
+    {
+        var response = await _supabase
+            .From<Profile>()
+            .Select("*")
+            .Get();
+        return Ok(response.Models);
+    }
+
+    // DELETE: api/users/me
     [HttpDelete("me")]
     public async Task<IActionResult> DeleteAccount()
     {

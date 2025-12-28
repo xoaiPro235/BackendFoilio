@@ -1,10 +1,7 @@
 ﻿using BackEndFolio.API.Hubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using Supabase;
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json.Serialization;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -61,13 +58,23 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 // C. Đăng ký Controllers + Cấu hình JSON (Quan trọng!)
+//builder.Services.AddControllers()
+//    .AddJsonOptions(options =>
+//    {
+//        // Bỏ qua lỗi vòng lặp (Circular Reference) khi join bảng
+//        // Ví dụ: User -> Project -> User -> ...
+//        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+//        options.JsonSerializerOptions.WriteIndented = true;
+//    });
+
 builder.Services.AddControllers()
-    .AddJsonOptions(options =>
+    .AddNewtonsoftJson(options =>
     {
-        // Bỏ qua lỗi vòng lặp (Circular Reference) khi join bảng
-        // Ví dụ: User -> Project -> User -> ...
-        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
-        options.JsonSerializerOptions.WriteIndented = true;
+        // Cấu hình để bỏ qua vòng lặp (nếu cần) bằng Newtonsoft
+        options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
+
+        // (Tùy chọn) Bỏ qua giá trị null cho gọn
+        options.SerializerSettings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
     });
 
 // D. Đăng ký SignalR (Realtime)
@@ -84,6 +91,7 @@ builder.Services.AddCors(options =>
               .AllowCredentials(); // Bắt buộc phải có dòng này để SignalR chạy được
     });
 });
+
 
 
 builder.Services.AddEndpointsApiExplorer();
@@ -111,6 +119,8 @@ app.UseAuthorization();
 
 
 app.MapControllers(); // Map các API Controller
+
+
 app.MapHub<AppHub>("/appHub"); // Map đường dẫn cho SignalR
 
 app.Run();

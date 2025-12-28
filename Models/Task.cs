@@ -8,6 +8,7 @@ namespace BackEndFolio.Models
     public class TaskItem : BaseModel
     {
         [PrimaryKey("id", false)]
+        [Column("id")]
         public string Id { get; set; }
 
         [Column("project_id")]
@@ -17,7 +18,7 @@ namespace BackEndFolio.Models
         public string? ParentTaskId { get; set; }
 
         [Column("title")]
-        public string? Title { get; set; }
+        public string Title { get; set; }
 
         [Column("description")]
         public string? Description { get; set; }

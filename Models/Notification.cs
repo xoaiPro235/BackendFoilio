@@ -6,6 +6,7 @@ namespace BackEndFolio.Models
     public class Notification : BaseModel
     {
         [PrimaryKey("id", false)]
+        [Column("id")]
         public string Id { get; set; }
 
         [Column("recipient_id")]

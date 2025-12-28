@@ -6,6 +6,7 @@ namespace BackEndFolio.Models
     public class Comment : BaseModel
     {
         [PrimaryKey("id", false)]
+        [Column("id")]
         public string Id { get; set; }
 
         [Column("task_id")]
