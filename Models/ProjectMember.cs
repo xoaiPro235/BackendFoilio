@@ -4,7 +4,6 @@ using Supabase.Postgrest.Models;
 namespace BackEndFolio.Models
 {
     [Table("project_members")]
-    
     public class ProjectMember : BaseModel
     {
         [PrimaryKey("project_id", false)]

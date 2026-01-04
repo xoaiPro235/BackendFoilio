@@ -10,6 +10,9 @@ namespace BackEndFolio.Models
         [Column("id")]
         public string Id { get; set; }
 
+        [Column("project_id")]
+        public string ProjectId { get; set; }
+
         [Column("task_id")]
         public string TaskId { get; set; }
 
@@ -26,10 +29,10 @@ namespace BackEndFolio.Models
         public DateTime CreatedAt { get; set; }
 
         // Join để lấy tên người làm hành động này
-        [Reference(typeof(Profile))]
-        public Profile Profile { get; set; }
+        //[Reference(typeof(Profile))]
+        //public Profile Profile { get; set; }
 
-        [Reference(typeof(TaskItem))]
-        public TaskItem Task { get; set; }
+        //[Reference(typeof(TaskItem))]
+        //public TaskItem Task { get; set; }
     }
 }

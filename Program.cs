@@ -85,7 +85,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://localhost:5173") // Thay đổi port React của bạn nếu khác
+        policy.WithOrigins("http://localhost:3000", "http://localhost:5173", "https://11j3np54-3000.asse.devtunnels.ms") // Thay đổi port React của bạn nếu khác
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials(); // Bắt buộc phải có dòng này để SignalR chạy được

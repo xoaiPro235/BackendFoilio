@@ -21,8 +21,8 @@ namespace BackEndFolio.Models
         [Column("created_at")]
         public DateTime CreatedAt { get; set; }
 
-        // Join để lấy thông tin người comment (Tên, Avatar)
-        [Reference(typeof(Profile))]
-        public Profile User { get; set; }
+        //// Join để lấy thông tin người comment (Tên, Avatar)
+        //[Reference(typeof(Profile))]
+        //public Profile User { get; set; }
     }
 }

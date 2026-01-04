@@ -1,10 +1,6 @@
-﻿using BackEndFolio.API.Hubs;
-using BackEndFolio.Models;
+﻿using BackEndFolio.Models;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.SignalR;
-using Supabase.Postgrest;
 using System.Security.Claims;
 using static Supabase.Postgrest.Constants;
 
@@ -71,7 +67,7 @@ public class ProjectController : ControllerBase
         return Ok(result);
 
 
-    } 
+    }
 
     // POST: api/projects (Create new project)
     [HttpPost]
@@ -122,6 +118,7 @@ public class ProjectController : ControllerBase
             m.Profile.Name,
             m.Profile.Email,
             m.Profile.AvatarUrl,
+            m.Role
         })
         .ToList();
         return Ok(members);
