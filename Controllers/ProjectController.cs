@@ -1,6 +1,8 @@
-﻿using BackEndFolio.Models;
+﻿using BackEndFolio.API.Hubs;
+using BackEndFolio.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 using static Supabase.Postgrest.Constants;
 
@@ -12,12 +14,12 @@ using static Supabase.Postgrest.Constants;
 public class ProjectController : ControllerBase
 {
     private readonly Supabase.Client _supabase;
-    //private readonly IHubContext<AppHub> _hubcontext;
+    private readonly IHubContext<AppHub> _hubcontext;
 
-    public ProjectController(Supabase.Client supabaseClient)
+    public ProjectController(Supabase.Client supabaseClient, IHubContext<AppHub> hubContext)
     {
         _supabase = supabaseClient;
-        //_hubcontext = hubContext;
+        _hubcontext = hubContext;
     }
 
     // GET: api/projects
@@ -138,7 +140,7 @@ public class ProjectController : ControllerBase
         var response = await _supabase.From<ProjectMember>().Insert(member);
         var newMember = response.Models.FirstOrDefault();
         // Bắn SignalR báo user đó biết (Optional)
-        // await _hubContext.Clients.User(member.UserId).SendAsync("Notification", "You were invited...");
+        await _hubcontext.Clients.User(member.UserId).SendAsync("Notification", "You were invited...");
         return Ok(newMember);
     }
 

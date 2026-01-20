@@ -212,7 +212,6 @@ public class TaskController : ControllerBase
             .From<TaskItem>()
             .Where(t => t.Id == id)
             .Delete();
-
         return Ok(new { message = "task deleted successfully" });
     }
 }

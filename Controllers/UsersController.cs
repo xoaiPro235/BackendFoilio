@@ -43,6 +43,42 @@ public class UsersController : ControllerBase
         return Ok(response.Models);
     }
 
+    // PATCH: api/users/me
+    [HttpPatch("me")]
+    public async Task<IActionResult> UpdateProfile([FromBody] ProfileUpdateRequest updatedProfile)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+        try
+        {
+            var query = _supabase.From<Profile>().Where(p => p.Id == userId);
+            
+            if (updatedProfile.Name != null)
+            {
+                query = query.Set(p => p.Name, updatedProfile.Name.Trim());
+            }
+            if (updatedProfile.Bio != null)
+            {
+                query = query.Set(p => p.Bio, updatedProfile.Bio.Trim());
+            }
+            if (updatedProfile.AvatarUrl != null)
+            {
+                query = query.Set(p => p.AvatarUrl, updatedProfile.AvatarUrl.Trim());
+            }
+
+            var response = await query.Update();
+            var profile = response.Models.FirstOrDefault();
+            return Ok(profile);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
     // DELETE: api/users/me
     [HttpDelete("me")]
     public async Task<IActionResult> DeleteAccount()

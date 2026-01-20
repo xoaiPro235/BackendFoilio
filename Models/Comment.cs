@@ -6,7 +6,6 @@ namespace BackEndFolio.Models
     public class Comment : BaseModel
     {
         [PrimaryKey("id", false)]
-        [Column("id")]
         public string Id { get; set; }
 
         [Column("task_id")]
@@ -24,5 +23,10 @@ namespace BackEndFolio.Models
         //// Join để lấy thông tin người comment (Tên, Avatar)
         //[Reference(typeof(Profile))]
         //public Profile User { get; set; }
+    }
+
+    public class CommentCreateRequest
+    {
+        public string Content { get; set; }
     }
 }

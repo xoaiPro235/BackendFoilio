@@ -6,7 +6,6 @@ namespace BackEndFolio.Models
     public class Attachment : BaseModel
     {
         [PrimaryKey("id", false)]
-        [Column("id")]
         public string Id { get; set; }
 
         [Column("task_id")]
@@ -29,5 +28,14 @@ namespace BackEndFolio.Models
 
         [Column("created_at")]
         public DateTime CreatedAt { get; set; }
+    }
+
+    // Class DTO nhận dữ liệu từ Frontend
+    public class AttachmentPayload
+    {
+        public string FileName { get; set; }
+        public string FileUrl { get; set; }
+        public string FileType { get; set; }
+        public long FileSize { get; set; }
     }
 }

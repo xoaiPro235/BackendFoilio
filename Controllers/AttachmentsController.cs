@@ -8,7 +8,7 @@ using System.Security.Claims;
 
 
 // Route: api/tasks/{taskId}/attachments
-[Route("api/tasks/{taskId}/attachments")]
+[Route("api/task/{taskId}/attachments")]
 [ApiController]
 [Authorize]
 public class AttachmentsController : ControllerBase
@@ -116,14 +116,5 @@ public class AttachmentsController : ControllerBase
             return url.Substring(index + token.Length);
         }
         return string.Empty;
-    }
-
-    // Class DTO nhận dữ liệu từ Frontend
-    public class AttachmentPayload
-    {
-        public string FileName { get; set; }
-        public string FileUrl { get; set; }
-        public string FileType { get; set; }
-        public long FileSize { get; set; }
     }
 }

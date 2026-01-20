@@ -21,4 +21,11 @@ namespace BackEndFolio.Models
         [Column("updated_at")]
         public DateTime UpdatedAt { get; set; }
     }
+
+    public class ProfileUpdateRequest
+    {
+        public string? Name { get; set; }
+        public string? AvatarUrl { get; set; }
+        public string? Bio { get; set; }
+    }
 }
