@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Supabase.Postgrest;
+using BackEndFolio.Services;
 
 
 [Route("api/[controller]")]
@@ -13,11 +14,17 @@ public class TaskController : ControllerBase
 {
     private readonly Supabase.Client _supabase;
     private readonly IHubContext<AppHub> _hubContext;
+    private readonly INotificationService _notificationService;
+    private readonly IEmailService _emailService;
+    private readonly IActivityLogService _activityLogService;
 
-    public TaskController(Supabase.Client supabase, IHubContext<AppHub> hubContext)
+    public TaskController(Supabase.Client supabase, IHubContext<AppHub> hubContext, INotificationService notificationService, IEmailService emailService, IActivityLogService activityLogService)
     {
         _supabase = supabase;
         _hubContext = hubContext;
+        _notificationService = notificationService;
+        _emailService = emailService;
+        _activityLogService = activityLogService;
     }
 
     // GET: api/tasks?projectId=...
@@ -97,7 +104,29 @@ public class TaskController : ControllerBase
 
             await _hubContext.Clients
                 .Group(createdTask.ProjectId)
-                .SendAsync("TaskCreated", createdTask);
+                .SendAsync("TaskCreated", new {
+                    id = createdTask.Id,
+                    projectId = createdTask.ProjectId,
+                    parentTaskId = createdTask.ParentTaskId,
+                    title = createdTask.Title,
+                    description = createdTask.Description,
+                    status = createdTask.Status,
+                    priority = createdTask.Priority,
+                    assigneeId = createdTask.AssigneeId,
+                    startDate = createdTask.StartDate,
+                    dueDate = createdTask.DueDate,
+                    createdAt = createdTask.CreatedAt
+                });
+
+            // Log activity
+            var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            await _activityLogService.RecordActivityAsync(
+                createdTask.ProjectId,
+                createdTask.Id,
+                currentUserId,
+                "created task",
+                createdTask.Title
+            );
 
             return Ok(createdTask);
         }
@@ -110,13 +139,14 @@ public class TaskController : ControllerBase
     {
         if (updates == null)
             return BadRequest("Patch body is required");
+        var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
         try
         {
             // 1. Kiểm tra task có tồn tại không
             var exists = await _supabase
                 .From<TaskItem>()
-                .Select("id, project_id")
+                .Select("id, project_id, title")
                 .Where(t => t.Id == id)
                 .Get();
 
@@ -150,17 +180,32 @@ public class TaskController : ControllerBase
 
             if (updates.AssigneeId != null)
             {
-                query = query.Set(
-                    t => t.AssigneeId,
-                    string.IsNullOrEmpty(updates.AssigneeId)
-                        ? null
-                        : updates.AssigneeId
-                );
-            }
+                // Cập nhật giá trị vào query (cho phép null)
+                var newAssigneeId = string.IsNullOrEmpty(updates.AssigneeId) ? null : updates.AssigneeId;
+                query = query.Set(t => t.AssigneeId, newAssigneeId);
 
+                // Chỉ gửi thông báo và mail nếu có người nhận mới
+                if (!string.IsNullOrEmpty(newAssigneeId))
+                {
+                    string taskLink = $"/project/{task.ProjectId}/board?selectedIssue={id}";
+
+                    await _notificationService.SendDirectNotification(
+                        newAssigneeId,
+                        "New Task Assigned",
+                        $"You have been assigned a new task: {task.Title}", // Đảm bảo đã select Title ở bước 1
+                        "SUCCESS",
+                        taskLink
+                    );
+
+                    var profile = await _supabase.From<Profile>().Where(p => p.Id == newAssigneeId).Single();
+                    if (profile?.Email != null)
+                        await _emailService.SendTaskNotificationEmailAsync(profile.Email, "New Task Assigned", task.Title, task.ProjectId, id);
+                }
+            }
             // 4. Thực thi UPDATE
             await query.Update();
 
+            // 5. SignalR – chỉ gửi dữ liệu cần thiết
             // 5. SignalR – chỉ gửi dữ liệu cần thiết
             if (!string.IsNullOrEmpty(task.ProjectId))
             {
@@ -168,16 +213,36 @@ public class TaskController : ControllerBase
                     .Group(task.ProjectId)
                     .SendAsync("TaskUpdated", new
                     {
-                        id,
-                        updates.Title,
-                        updates.Status,
-                        updates.Priority,
-                        updates.Description,
-                        updates.StartDate,
-                        updates.DueDate,
-                        updates.AssigneeId
+                        id = id,
+                        projectId = task.ProjectId,
+                        title = updates.Title,
+                        status = updates.Status,
+                        priority = updates.Priority,
+                        description = updates.Description,
+                        startDate = updates.StartDate,
+                        dueDate = updates.DueDate,
+                        assigneeId = updates.AssigneeId
                     });
             }
+
+            // Log activity
+            List<string> changes = new List<string>();
+            if (updates.Title != null) changes.Add("title");
+            if (updates.Status != null) changes.Add($"status to {updates.Status}");
+            if (updates.Priority != null) changes.Add($"priority to {updates.Priority}");
+            if (updates.AssigneeId != null) changes.Add("assignee");
+            if (updates.Description != null) changes.Add("description");
+            if (updates.StartDate != null || updates.DueDate != null) changes.Add("dates");
+
+            string action = changes.Count > 0 ? "updated " + string.Join(", ", changes) : "updated task";
+
+            await _activityLogService.RecordActivityAsync(
+                task.ProjectId,
+                id,
+                currentUserId,
+                action,
+                task.Title
+            );
 
             return NoContent();
         }
@@ -204,14 +269,31 @@ public class TaskController : ControllerBase
     }
 
 
-    // DELETE: api/tasks/{id}
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteTask(string id)
     {
+        var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        
+        // Get details before delete for logging
+        var taskResponse = await _supabase.From<TaskItem>().Where(t => t.Id == id).Get();
+        var task = taskResponse.Models.FirstOrDefault();
+
         await _supabase
             .From<TaskItem>()
             .Where(t => t.Id == id)
             .Delete();
-        return Ok(new { message = "task deleted successfully" });
+
+            // 5. Log & Broadcast
+            if (task != null)
+            {
+                await _activityLogService.RecordActivityAsync(
+                    task.ProjectId,
+                    id,
+                    currentUserId,
+                    "deleted task",
+                    task.Title
+                );
+            }
+            return NoContent();
     }
 }

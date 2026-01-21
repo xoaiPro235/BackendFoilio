@@ -73,7 +73,7 @@ namespace BackEndFolio.Models
         public string? ParentTaskId { get; set; }
         public string Title { get; set; }
         public string? Description { get; set; }
-        public string? Status { get; set; } = "TO DO";
+        public string? Status { get; set; } = "TODO";
         public string? Priority { get; set; } = "MEDIUM";
         public string? AssigneeId { get; set; }
         public DateOnly? StartDate { get; set; }

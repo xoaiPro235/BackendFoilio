@@ -23,9 +23,7 @@ public class AttachmentsController : ControllerBase
         _supabase = supabase;
     }
 
-    // ==========================================
     // 1. POST: Lưu thông tin file vào DB (Sau khi Frontend upload xong)
-    // ==========================================
     [HttpPost]
     public async Task<IActionResult> SaveAttachmentMetadata(string taskId, [FromBody] AttachmentPayload payload)
     {
@@ -57,10 +55,8 @@ public class AttachmentsController : ControllerBase
         }
     }
 
-    // ==========================================
     // 2. DELETE: Xóa file khỏi Storage và DB
     // https://[project_id].supabase.co/storage/v1/object/public/[bucket]/[asset-name]
-    // ==========================================
     [HttpDelete("{fileId}")]
     public async Task<IActionResult> DeleteAttachment(string taskId, string fileId)
     {

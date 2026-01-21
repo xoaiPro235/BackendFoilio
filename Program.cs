@@ -1,4 +1,5 @@
 ﻿using BackEndFolio.API.Hubs;
+using BackEndFolio.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -16,6 +17,15 @@ builder.Services.AddScoped<Supabase.Client>(_ =>
         AutoConnectRealtime = true
     }));
 
+// Đăng ký Services
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IActivityLogService, ActivityLogService>();
+
+// Đăng ký Background Worker
+builder.Services.AddHostedService<TaskReminderWorker>();
+
+// Đừng quên đăng ký SignalR đã có trong file của bạn
 
 
 // B. Cấu hình JWT Authentication 
@@ -57,15 +67,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-// C. Đăng ký Controllers + Cấu hình JSON (Quan trọng!)
-//builder.Services.AddControllers()
-//    .AddJsonOptions(options =>
-//    {
-//        // Bỏ qua lỗi vòng lặp (Circular Reference) khi join bảng
-//        // Ví dụ: User -> Project -> User -> ...
-//        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
-//        options.JsonSerializerOptions.WriteIndented = true;
-//    });
 
 builder.Services.AddControllers()
     .AddNewtonsoftJson(options =>
@@ -85,7 +86,12 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://localhost:5173", "https://11j3np54-3000.asse.devtunnels.ms") // Thay đổi port React của bạn nếu khác
+        policy.SetIsOriginAllowed(origin => 
+                {
+                    if (string.IsNullOrWhiteSpace(origin)) return false;
+                    var uri = new Uri(origin);
+                    return uri.Host == "localhost" || uri.Host.EndsWith(".devtunnels.ms");
+                })
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials(); // Bắt buộc phải có dòng này để SignalR chạy được
@@ -107,12 +113,13 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-// 1. Kích hoạt CORS (Phải đặt trước Auth)
-app.UseCors("AllowFrontend");
+
 
 // 2. Kích hoạt Routing
 app.UseRouting();
 
+// 1. Kích hoạt CORS (Phải đặt trước Auth)
+app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();

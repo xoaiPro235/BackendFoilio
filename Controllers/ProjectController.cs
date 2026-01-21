@@ -1,5 +1,6 @@
 ﻿using BackEndFolio.API.Hubs;
 using BackEndFolio.Models;
+using BackEndFolio.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -15,11 +16,13 @@ public class ProjectController : ControllerBase
 {
     private readonly Supabase.Client _supabase;
     private readonly IHubContext<AppHub> _hubcontext;
+    private readonly IActivityLogService _activityLogService;
 
-    public ProjectController(Supabase.Client supabaseClient, IHubContext<AppHub> hubContext)
+    public ProjectController(Supabase.Client supabaseClient, IHubContext<AppHub> hubContext, IActivityLogService activityLogService)
     {
         _supabase = supabaseClient;
         _hubcontext = hubContext;
+        _activityLogService = activityLogService;
     }
 
     // GET: api/projects
@@ -100,6 +103,15 @@ public class ProjectController : ControllerBase
 
         await _supabase.From<ProjectMember>().Insert(member);
 
+        // Log activity
+        await _activityLogService.RecordActivityAsync(
+            newProject.Id,
+            null,
+            userId,
+            "CREATED",
+            "Project"
+        );
+
         return Ok(newProject);
     }
 
@@ -141,6 +153,17 @@ public class ProjectController : ControllerBase
         var newMember = response.Models.FirstOrDefault();
         // Bắn SignalR báo user đó biết (Optional)
         await _hubcontext.Clients.User(member.UserId).SendAsync("Notification", "You were invited...");
+
+        // Log activity
+        var inviterId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        await _activityLogService.RecordActivityAsync(
+            id,
+            null,
+            inviterId,
+            "INVITED",
+            $"User {rq.UserId}"
+        );
+
         return Ok(newMember);
     }
 
@@ -152,6 +175,17 @@ public class ProjectController : ControllerBase
             .From<ProjectMember>()
             .Where(x => x.ProjectId == id && x.UserId == userId)
             .Delete();
+
+        // Log activity
+        var removerId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        await _activityLogService.RecordActivityAsync(
+            id,
+            null,
+            removerId,
+            "REMOVED",
+            $"User {userId}"
+        );
+
         return Ok(new { message = "Member removed successfully" });
     }
 

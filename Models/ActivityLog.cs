@@ -7,7 +7,6 @@ namespace BackEndFolio.Models
     public class ActivityLog : BaseModel
     {
         [PrimaryKey("id", false)]
-        [Column("id")]
         public string Id { get; set; }
 
         [Column("project_id")]

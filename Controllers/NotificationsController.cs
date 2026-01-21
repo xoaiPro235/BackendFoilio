@@ -31,8 +31,8 @@ public class NotificationsController : ControllerBase
             var response = await _supabase.From<Notification>()
                 // Lấy thông báo + Thông tin người gửi (Actor)
                 // Cú pháp: profiles!actor_id nghĩa là join bảng profiles thông qua khóa ngoại actor_id
-                .Select("*, profiles!actor_id(*)")
-                .Where(x => x.RecipientId == userId) // Chỉ lấy của mình
+                .Select("*")
+                .Where(x => x.UserId == userId) // Chỉ lấy của mình
                 .Order("created_at", Constants.Ordering.Descending) // Mới nhất lên đầu
                 .Limit(limit)
                 .Get();
@@ -56,7 +56,7 @@ public class NotificationsController : ControllerBase
         {
             // Update cột IsRead = true
             await _supabase.From<Notification>()
-                .Where(x => x.Id == id && x.RecipientId == userId) // Security: Chỉ chủ sở hữu mới được đánh dấu
+                .Where(x => x.Id == id && x.UserId == userId) // Security: Chỉ chủ sở hữu mới được đánh dấu
                 .Set(x => x.IsRead, true)
                 .Update();
 
@@ -78,7 +78,7 @@ public class NotificationsController : ControllerBase
         try
         {
             await _supabase.From<Notification>()
-                .Where(x => x.RecipientId == userId && x.IsRead == false)
+                .Where(x => x.UserId == userId && x.IsRead == false)
                 .Set(x => x.IsRead, true)
                 .Update();
 
