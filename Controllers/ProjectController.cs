@@ -156,12 +156,15 @@ public class ProjectController : ControllerBase
 
         // Log activity
         var inviterId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var invitedUser = await _supabase.From<Profile>().Where(p => p.Id == rq.UserId).Single();
+        var invitedTarget = invitedUser != null ? (string.IsNullOrEmpty(invitedUser.Name) ? invitedUser.Email : invitedUser.Name) : rq.UserId;
+
         await _activityLogService.RecordActivityAsync(
             id,
             null,
             inviterId,
             "INVITED",
-            $"User {rq.UserId}"
+            $"User {invitedTarget}"
         );
 
         return Ok(newMember);
@@ -178,12 +181,15 @@ public class ProjectController : ControllerBase
 
         // Log activity
         var removerId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var removedUser = await _supabase.From<Profile>().Where(p => p.Id == userId).Single();
+        var removedTarget = removedUser != null ? (string.IsNullOrEmpty(removedUser.Name) ? removedUser.Email : removedUser.Name) : userId;
+
         await _activityLogService.RecordActivityAsync(
             id,
             null,
             removerId,
             "REMOVED",
-            $"User {userId}"
+            $"User {removedTarget}"
         );
 
         return Ok(new { message = "Member removed successfully" });
@@ -221,6 +227,57 @@ public class ProjectController : ControllerBase
         await _supabase.From<ProjectMember>().Update(member);
 
         return Ok(member.Role);
+    }
+
+    // PATCH: api/projects/{id} (Update project info)
+    [HttpPatch("{id}")]
+    public async Task<IActionResult> UpdateProject(string id, [FromBody] UpdateProjectRequest request)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        // 1. Lấy project hiện tại
+        var response = await _supabase
+            .From<Project>()
+            .Where(x => x.Id == id)
+            .Get();
+
+        var project = response.Models.FirstOrDefault();
+
+        if (project == null)
+        {
+            return NotFound();
+        }
+
+        // 2. Kiểm tra Ownership
+        if (project.OwnerId != userId)
+        {
+            return Forbid("Only the owner can update project information.");
+        }
+
+        // 3. Cập nhật thông tin và chuẩn bị log detail
+        var changes = new List<string>();
+        if (project.Name != request.Name) changes.Add($"name to '{request.Name}'");
+        if (project.Description != request.Description) changes.Add("description");
+
+        project.Name = request.Name;
+        project.Description = request.Description;
+
+        await _supabase.From<Project>().Update(project);
+
+        // 4. Log activity
+        if (changes.Count > 0)
+        {
+            var detail = string.Join(" and ", changes);
+            await _activityLogService.RecordActivityAsync(
+                id,
+                null,
+                userId,
+                "UPDATED",
+                $"Project {detail}"
+            );
+        }
+
+        return Ok(project);
     }
 }
 

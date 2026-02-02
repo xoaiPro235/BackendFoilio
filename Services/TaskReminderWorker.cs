@@ -91,7 +91,6 @@ namespace BackEndFolio.Services
                         task.Id,
                         actionType);
                 }
-
                 // 3. Cập nhật trạng thái đã nhắc nhở (Nếu bạn đã thêm cột reminder_sent vào DB)
                 // await supabase.From<TaskItem>().Where(t => t.Id == task.Id).Set(t => t.ReminderSent, true).Update();
             }

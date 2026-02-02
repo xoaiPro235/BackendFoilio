@@ -38,8 +38,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            // Bỏ dòng ValidateIssuerSigningKey và IssuerSigningKey cũ đi
-
             ValidateIssuer = true, // Nên bật true vì ta đã có Authority chuẩn
             ValidIssuer = $"{supabaseUrl}/auth/v1", // Token phải do đúng URL này cấp
 

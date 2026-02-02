@@ -178,34 +178,41 @@ public class TaskController : ControllerBase
             if (updates.DueDate != null)
                 query = query.Set(t => t.DueDate, updates.DueDate);
 
+            string assigneeLogName = "";
             if (updates.AssigneeId != null)
             {
-                // Cập nhật giá trị vào query (cho phép null)
                 var newAssigneeId = string.IsNullOrEmpty(updates.AssigneeId) ? null : updates.AssigneeId;
                 query = query.Set(t => t.AssigneeId, newAssigneeId);
 
-                // Chỉ gửi thông báo và mail nếu có người nhận mới
                 if (!string.IsNullOrEmpty(newAssigneeId))
                 {
-                    string taskLink = $"/project/{task.ProjectId}/board?selectedIssue={id}";
-
-                    await _notificationService.SendDirectNotification(
-                        newAssigneeId,
-                        "New Task Assigned",
-                        $"You have been assigned a new task: {task.Title}", // Đảm bảo đã select Title ở bước 1
-                        "SUCCESS",
-                        taskLink
-                    );
-
                     var profile = await _supabase.From<Profile>().Where(p => p.Id == newAssigneeId).Single();
-                    if (profile?.Email != null)
-                        await _emailService.SendTaskNotificationEmailAsync(profile.Email, "New Task Assigned", task.Title, task.ProjectId, id);
+                    if (profile != null)
+                    {
+                        assigneeLogName = profile.Name;
+                        string taskLink = $"/project/{task.ProjectId}/board?selectedIssue={id}";
+
+                        await _notificationService.SendDirectNotification(
+                            newAssigneeId,
+                            "New Task Assigned",
+                            $"You have been assigned a new task: {task.Title}",
+                            "SUCCESS",
+                            taskLink
+                        );
+
+                        if (profile.Email != null)
+                            await _emailService.SendTaskNotificationEmailAsync(profile.Email, "New Task Assigned", task.Title, task.ProjectId, id);
+                    }
+                }
+                else
+                {
+                    assigneeLogName = "Unassigned";
                 }
             }
+
             // 4. Thực thi UPDATE
             await query.Update();
 
-            // 5. SignalR – chỉ gửi dữ liệu cần thiết
             // 5. SignalR – chỉ gửi dữ liệu cần thiết
             if (!string.IsNullOrEmpty(task.ProjectId))
             {
@@ -230,7 +237,7 @@ public class TaskController : ControllerBase
             if (updates.Title != null) changes.Add("title");
             if (updates.Status != null) changes.Add($"status to {updates.Status}");
             if (updates.Priority != null) changes.Add($"priority to {updates.Priority}");
-            if (updates.AssigneeId != null) changes.Add("assignee");
+            if (updates.AssigneeId != null) changes.Add($"assignee to {assigneeLogName}");
             if (updates.Description != null) changes.Add("description");
             if (updates.StartDate != null || updates.DueDate != null) changes.Add("dates");
 
