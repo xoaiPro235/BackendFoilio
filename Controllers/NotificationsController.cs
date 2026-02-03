@@ -89,4 +89,25 @@ public class NotificationsController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    // 4. Xóa thông báo vĩnh viễn
+    // DELETE: api/notifications/{id}
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteNotification(string id)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        try
+        {
+            await _supabase.From<Notification>()
+                .Where(x => x.Id == id && x.UserId == userId)
+                .Delete();
+
+            return Ok(new { message = "Notification deleted" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }
