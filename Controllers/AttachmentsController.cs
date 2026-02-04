@@ -14,6 +14,7 @@ using System.Security.Claims;
 [Authorize]
 public class AttachmentsController : ControllerBase
 {
+    private readonly Supabase.Client _supabase;
     private readonly IActivityLogService _activityLogService;
     private const string BUCKET_NAME = "attachments";
 
