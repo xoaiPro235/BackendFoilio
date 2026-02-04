@@ -13,14 +13,13 @@ using System.Security.Claims;
 [Authorize]
 public class AttachmentsController : ControllerBase
 {
-    private readonly Supabase.Client _supabase;
-
-    // Tên bucket phải khớp với tên bucket bạn tạo trên Supabase Storage
+    private readonly IActivityLogService _activityLogService;
     private const string BUCKET_NAME = "attachments";
 
-    public AttachmentsController(Supabase.Client supabase)
+    public AttachmentsController(Supabase.Client supabase, IActivityLogService activityLogService)
     {
         _supabase = supabase;
+        _activityLogService = activityLogService;
     }
 
     // 1. POST: Lưu thông tin file vào DB (Sau khi Frontend upload xong)
@@ -47,6 +46,22 @@ public class AttachmentsController : ControllerBase
             var response = await _supabase.From<Attachment>().Insert(newFile);
             var insertedFile = response.Models.FirstOrDefault();
 
+            if (insertedFile != null)
+            {
+                // Log activity
+                var taskRes = await _supabase.From<TaskItem>().Select("project_id, title").Where(x => x.Id == taskId).Single();
+                if (taskRes != null)
+                {
+                    await _activityLogService.RecordActivityAsync(
+                        taskRes.ProjectId,
+                        taskId,
+                        userId,
+                        "uploaded a file",
+                        $"{payload.FileName} to {taskRes.Title}"
+                    );
+                }
+            }
+
             return Ok(insertedFile);
         }
         catch (Exception ex)
@@ -71,10 +86,9 @@ public class AttachmentsController : ControllerBase
             var attachment = response.Models.FirstOrDefault();
             if (attachment == null) return NotFound(new { message = "File not found" });
 
-            // 2. Parse URL để lấy đường dẫn thực trên Storage (Path)
-            // URL VD: .../storage/v1/object/public/attachments/folder/abc.png
-            // Cần lấy: folder/abc.png
             string storagePath = GetStoragePathFromUrl(attachment.FileUrl);
+            var fileName = attachment.FileName;
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
             // 3. Xóa trên Storage trước (Quan trọng: Xóa file vật lý trước)
             if (!string.IsNullOrEmpty(storagePath))
@@ -86,6 +100,19 @@ public class AttachmentsController : ControllerBase
 
             // 4. Xóa record trong Database
             await _supabase.From<Attachment>().Where(x => x.Id == fileId).Delete();
+
+            // Log activity
+            var taskRes = await _supabase.From<TaskItem>().Select("project_id, title").Where(x => x.Id == taskId).Single();
+            if (taskRes != null)
+            {
+                await _activityLogService.RecordActivityAsync(
+                    taskRes.ProjectId,
+                    taskId,
+                    userId,
+                    "removed a file",
+                    $"{fileName} from {taskRes.Title}"
+                );
+            }
 
             return Ok(new { message = "Deleted successfully" });
         }
