@@ -1,5 +1,6 @@
 ﻿using BackEndFolio.API.Hubs;
 using BackEndFolio.Models;
+using BackEndFolio.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
