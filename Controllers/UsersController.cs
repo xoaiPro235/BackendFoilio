@@ -18,8 +18,23 @@ public class UsersController : ControllerBase
         _supabaseServiceKey = configuration["Supabase:Key"];
     }
 
-    // GET: api/users/search?q=alice
-    [HttpGet("search")]
+    // GET: api/users/exists?email=test@example.com
+    [HttpGet("exists")]
+    [AllowAnonymous]
+    public async Task<IActionResult> CheckEmailExists([FromQuery] string email)
+    {
+        if (string.IsNullOrEmpty(email)) return BadRequest(new { message = "Email is required" });
+
+        var response = await _supabase
+            .From<Profile>()
+            .Where(p => p.Email == email)
+            .Get();
+
+        return Ok(new { exists = response.Models.Any() });
+    }
+
+    // GET: api/users/search?q=alice
+    [HttpGet("search")]
     public async Task<IActionResult> SearchUser([FromQuery] string q)
     {
         if (string.IsNullOrEmpty(q)) return Ok(new List<object>());
